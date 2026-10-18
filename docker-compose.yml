@@ -1,0 +1,77 @@
+name: info-brasil-api
+
+services:
+  info-brasil-api:
+    image: rogertech/info-brasil-service:1.0.0
+    container_name: info-brasil-api
+    user: root
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "9091:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SERVER_PORT=8080
+      - JAVA_OPTS=-Xms512m -Xmx512m
+    restart: always
+    networks:
+      - info-brasil-network
+    volumes:
+      # COMPARTILHA A PASTA DE LOGS: Altere "/app/logs" se o seu Dockerfile usar outra pasta interna
+      - app-logs:/app/logs
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g" # 👈 Aumentado para 1GB para rodar sem travar
+    ports:
+      - "9200:9200"
+    restart: always
+    networks:
+      - info-brasil-network
+    volumes:
+      - elastic-data:/usr/share/elasticsearch/data
+    # 👈 Trecho novo: Avisa o docker se o Elastic está saudável de verdade
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.1
+    container_name: logstash
+    restart: always
+    networks:
+      - info-brasil-network
+    volumes:
+      - app-logs:/usr/share/logstash/pipeline/logs
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    depends_on:
+      elasticsearch:
+        condition: service_healthy # 👈 Garante que o Logstash só inicia quando o Elastic aceitar conexões
+
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.1
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    restart: always
+    networks:
+      - info-brasil-network
+    depends_on:
+      - elasticsearch
+
+networks:
+  info-brasil-network:
+    driver: bridge
+
+# Declaração dos volumes que guardam os dados com segurança
+volumes:
+  app-logs:
+  elastic-data:
