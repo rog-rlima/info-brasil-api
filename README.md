@@ -33,6 +33,10 @@ Execute o comando abaixo na raiz do projeto para compilar o código fonte de for
 ```bash
 docker compose up -d --build
 ```
+Acesse o Swagger:
+```
+http://localhost:9091/swagger-ui.html
+```
 
 ### 3. Acompanhar os Logs da Aplicação
 Para visualizar a inicialização do Spring Boot e as mensagens do Logback em tempo real:
